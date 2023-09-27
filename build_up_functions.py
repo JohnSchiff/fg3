@@ -9,7 +9,7 @@ import matplotlib.dates as mdates
 import shutil
 import os
 import sys
-# pd.set_option('display.max_rows', 201)
+pd.set_option('display.max_rows', 201)
 pd.set_option('display.max_columns', None)
 pd.options.mode.chained_assignment = None  # Disable the warning
 
@@ -60,7 +60,7 @@ def delete_file(file):
         # os.remove() function to remove the file
         os.remove(file)
         # Printing the confirmation message of deletion
-        print("File Deleted successfully")
+        #print("File Deleted successfully")
     else:
         return ("File does not exist")
 
@@ -120,22 +120,6 @@ def Unzip_files(zip_files, extract_path):
     unzip_files = glob.glob(extract_path+'/*', recursive=True)
     return unzip_files
 
-
-def date_to_timestamp(df):
-    # convert the integer columns to strings and zero-pad them if necessary
-    df['date'] = df['date'].astype(str).str.zfill(8)
-    df['time'] = df['time'].astype(str).str.zfill(8)
-
-    # combine the date and time columns into a single string column
-    datetime_str = df['date'] + df['time']
-
-    # convert the datetime string to a timestamp column
-    df['timestamp'] = pd.to_datetime(datetime_str, format='%Y%m%d%H%M%S%f')
-
-    # remove "date" and "time" columns
-    df.drop(columns=['date', 'time'], inplace=True)
-
-    return df
 
 
 def extract_single_file(file, extract_path):
@@ -197,38 +181,6 @@ def extract_rar_files(rar_files, extract_path):
         extract_single_file(rar_files, extract_path)
 
 
-def optimize_dataframe_types(df):
-    optimized_df = pd.DataFrame()
-
-    for col in df.columns:
-        current_type = df[col].dtype
-
-        if np.issubdtype(current_type, np.integer):
-            if df[col].min() >= 0:
-                optimized_type = np.uint8 if df[col].max(
-                ) <= 255 else np.uint16
-            else:
-                optimized_type = np.int16 if df[col].min() >= np.iinfo(
-                    np.int16).min and df[col].max() <= np.iinfo(np.int16).max else np.int32
-
-        elif np.issubdtype(current_type, np.floating):
-            optimized_type = np.float32 if df[col].min() >= np.finfo(
-                np.float32).min and df[col].max() <= np.finfo(np.float32).max else np.float64
-
-        elif current_type == np.dtype('O'):  # Check for object dtype (strings)
-            optimized_df[col] = df[col].astype('category') if len(
-                df[col].unique()) <= 0.5 * len(df[col]) else df[col]
-
-        elif np.issubdtype(current_type, np.datetime64):
-            optimized_df[col] = df[col]
-
-        else:
-            optimized_type = current_type
-
-        if current_type != np.dtype('datetime64[ns]'):
-            optimized_df[col] = df[col].astype(optimized_type)
-
-    return optimized_df
 
 # ============================
 # ============================
@@ -338,41 +290,6 @@ def madad_basis(df, ta35):
 # ============================
 
 
-def convert_csv_to_parquet(file, path):
-    '''
-    convert csv format file to Parquet format to save space
-    90% in most cases
-    input - files and main path 
-    output - same file with parquet format
-    '''
-
-    file_name = file[-15:-7]
-
-    try:
-        df = pd.read_csv(file, sep=',', header=0)
-    except:
-        return ('Error')
-
-    # convert file to Parquet file to save space
-    df.to_parquet(path+str(file_name)+'.parquet')
-
-    # delete csv
-    delete_file(file)
-    print('CSV file deleted')
-
-    # Open the Parquet file
-    df_parquet = pd.read_parquet(path +
-                                 str(file_name)
-                                 + '.parquet').reset_index()
-
-    delete_file(path +
-                str(file_name)
-                + '.parquet')
-    print('Parquet file delete')
-
-    return (df_parquet)
-
-
 def quotes_parser(df):
 
     col_supply = ["sug", "date", "time", "kod", "mispar_hoze", "p1_Ask", "p2_Ask",
@@ -440,7 +357,8 @@ def quotes_filter(df_quotes):
     # chage type of columns from float to integers
     df_quotes[int_32_cols] = df_quotes[int_32_cols].astype('int32')
     df_quotes[int_16_cols] = df_quotes[int_16_cols].astype('int16')
-
+    
+    # converrt ta35 float 32
     df_quotes['ta35'] = df_quotes['ta35'].astype('float32')
     df_quotes = date_to_timestamp(df_quotes)
 
@@ -473,39 +391,45 @@ def quotes_merge_with_option_details(df, df_options_id):\
 def quotes_add_computed_ta35_index(df, ta35):
     # dataframe just relevant columns
     df_filtered = df[['ta35', 'mimush', 'dte', 'timestamp']]
-    
+
     # Get the cuurent date
     current_day = pd.to_datetime(df_filtered.timestamp).dt.floor('D')
     date = current_day.iloc[0]
     # round the original ta35 column from data
     df_filtered['ta35'] = (df_filtered['ta35'].round(-1)).astype(int)
 
-    # Get High of day 
+    # Get High of day rounded
     high_dayly = ta35.loc[ta35.date == date].High.iloc[0]
-    # Get Low of day
+    high_dayly = round(high_dayly, -1)
+    # Get Low of day rounded
     low_dayly = ta35.loc[ta35.date == date].Low.iloc[0]
-    
-    # Filter where ta35 column is between the range
-    ta35_dayly = df_filtered.loc[(df_filtered.ta35 >= low_dayly) & (df_filtered.ta35 <= high_dayly) &
-    (df_filtered.mimush >= low_dayly) & (df_filtered.mimush <= high_dayly)].drop_duplicates(subset='timestamp')
+    low_dayly = round(low_dayly, -1)
 
-    # Sort Dataframe by time
-    ta35_dayly.sort_values(by='timestamp', inplace=True)
+    # filter df  that ta35 in the range of high and low and get each timestamp the most common value
+    df_rel = pd.DataFrame(df_filtered.loc[(df_filtered.ta35 >= low_dayly) & (df_filtered.ta35 <= high_dayly) &
+                                          (df.mimush >= low_dayly) & (df.mimush <= high_dayly)].groupby(
+        'timestamp').ta35.value_counts().reset_index())
 
-    # Create column of diffrenece between timestamp
-    ta35_dayly['time_diff'] = ta35_dayly['timestamp'].diff().dt.total_seconds()
-    # Filter by time diff less than second
-    ta35_dayly = ta35_dayly.loc[(ta35_dayly.time_diff <= 1)]
-    ta35_dayly = ta35_dayly[['timestamp', 'ta35']].reset_index(drop=True)
+    # Calculate the most common value for each 'timestamp' group
+    most_common_values = df_rel.groupby(df_rel['timestamp'].dt.strftime('%H:%M:%S'))['ta35'].apply(
+        lambda x: x.mode().iloc[0]).reset_index()
 
-    df_with_ta35 = pd.merge_asof(df.drop(columns='ta35').sort_values(
-        by='timestamp'), ta35_dayly, on='timestamp',  direction='backward').dropna()
-    
-    df_with_ta35['diff_strike'] = df_with_ta35['mimush'] - df_with_ta35['ta35']
-    
-    df_with_ta35['diff_strike'] = df_with_ta35['diff_strike'].astype('int16')
-    df_with_ta35['ta35'] = df_with_ta35['ta35'].astype('int16')
+    # Create a mapping dictionary timestamp and value of ta35
+    mapping_dict = dict(
+        zip(most_common_values['timestamp'], most_common_values['ta35']))
 
-    df_with_ta35.drop(columns=['name','pkiya'],inplace=True)
-    
-    return df_with_ta35
+    # Correct the ta35 values by mapping values and forward-fill NaN values
+    df['ta35'] = df['timestamp'].dt.strftime('%H:%M:%S').map(
+        mapping_dict).fillna(method='ffill').astype(int)
+
+    # Crete column of diffrent strike from ta35
+    df['diff_strike'] = df['mimush'] - df['ta35']
+
+    # Foramtting int16 for effciency
+    df['diff_strike'] = df['diff_strike'].astype('int16')
+    df['ta35'] = df['ta35'].astype('int16')
+
+    # Drop columns
+    df.drop(columns=['name', 'pkiya'], inplace=True)
+
+    return df

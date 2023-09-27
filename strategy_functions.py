@@ -8,12 +8,15 @@ from datetime import datetime, timedelta
 import s3fs
 import matplotlib.pyplot as plt
 import io
+from datetime import time
 
 s3 = s3fs.S3FileSystem()
 
 # ta35 index
 # ta35 = pd.read_csv('ta35_close_for_results.csv', parse_dates=[
 #                    'date']).sort_values(by='date')
+day_of_week_map = {0: 2, 1: 3, 2: 4,
+                   3: 5, 4: 6, 5: 7, 6: 1}
 
 
 def get_month_of_file(file):
@@ -31,34 +34,18 @@ def set_times(df,min_after_open=5, min_before_close=5):
     
     return time_open,time_close
 
-def process_files(files):
-    rel_cols = ['timestamp', 'mispar_hoze', 'p1_Bid', 'p1_Ask', 'madad',
-                'type', 'strike', 'month', 'year', 'diff_mimush', 'dte', 'ta35_index']
-    l = []
+def get_night_quotes(df, dte_min, dte_max,option_type, diff_strike, time_close):
+    print(len(df), 'initally')
+    a = filter_by_diff_strike(df, diff_strike, time_close)
+    print(len(a), 'after diff_strike filter')
 
-    for file in files:
-        df = pd.read_parquet(file, columns=rel_cols, filesystem=s3)
-        df.set_index('timestamp', inplace=True)
-        df = clean_outliers_quotes(df)
-        df_open, df_close = open_close_quotes(df, open_time, close_time)
-        df_close = filter_by_dte(df_close, dte_min, dte_max)
-        df_close = filter_by_diff_strike(
-            df_close, min_diff=diff_min, max_diff=diff_max)
-        if file == files[0]:
-            df_prev_day = df_close
-            continue
-        id_options_close = df_prev_day.mispar_hoze.to_list()
+    # df = filter_by_dte(df, dte_min, dte_max)
+    # print(len(df), 'after dte filter')
+    # df = filter_by_option_type(df, option_type)
+    # print(len(df), 'after type filter')
+    
+    return df
 
-        df_open = df_open.loc[df_open.mispar_hoze.isin(id_options_close)]
-        mrg = df_open.merge(df_prev_day, on=[
-                            'mispar_hoze', 'type', 'strike', 'month', 'year'], suffixes=('_open', '_close'))
-        mrg['pnl'] = -mrg.p1_Ask_close + mrg.p1_Bid_open
-        l.append(mrg)
-
-        df_prev_day = df_close
-
-    df_results = pd.concat(l).reset_index(drop=True)
-    return df_results
 
 
 def open_close_quotes(df, time_open='10:00', time_close='17:30'):
@@ -91,6 +78,47 @@ def open_close_quotes(df, time_open='10:00', time_close='17:30'):
 
     return df_open, df_close
 
+def filter_open_time(df, time_open):
+    time_open_plus_minute = (datetime.combine(datetime.today(), time_open) + timedelta(minutes=1)).time()
+    cond_time_open = (df.timestamp.dt.time >= time_open) & (
+        df.timestamp.dt.time <= time_open_plus_minute)
+    df = df.loc[cond_time_open]
+    
+    return df
+    
+def filter_close_time(df, time_close):
+    
+    # Convert to datetime format
+    time_close = datetime.strptime(time_close, '%H:%M').time()
+
+    # protection if time close of date is earlier
+    max_time = df.timestamp.dt.time.max()
+    day_in_week = df.timestamp.dt.dayofweek.map(day_of_week_map).iloc[0]
+    if day_in_week == 1:
+        max_time = time(16, 0, 0)   
+    if max_time < time_close:
+        print(max_time)
+        time_close = max_time    
+    time_close_minus_minute = (datetime.combine(datetime.today(), time_close) - timedelta(minutes=1)
+                             ).time()
+    cond_time = (df.timestamp.dt.time <= time_close) &(
+        df.timestamp.dt.time >= time_close_minus_minute)
+    df = df.loc[cond_time]
+    
+    return df
+    
+def filter_by_times(df, time_open, time_close):
+
+    # Make sure all data between  given trading hours time_open to time_close
+    # alos good for filtering out to speed up 
+    
+    time_open = datetime.strptime(time_open, '%H:%M').time()
+    time_close = datetime.strptime(time_close, '%H:%M').time()
+    cond_time = (df.timestamp.dt.time <= time_close) & (
+        df.timestamp.dt.time >= time_open)
+    df = df.loc[cond_time]
+    
+    return df
 
 def filter_by_dte(df, dte_min=1, dte_max=31):
     cond_dte = (df.dte <= dte_max) & (df.dte >= dte_min)
@@ -99,21 +127,17 @@ def filter_by_dte(df, dte_min=1, dte_max=31):
     return df
 
 
-def filter_by_diff_strike(df, diff_min=-10, diff_max=10):
-    cond_diff_strike = (df.diff_mimush >= diff_min) & (
-        df.diff_mimush <= diff_max)
+def filter_by_diff_strike(df, diff_strike, time_close):
+    ta35 = get_ta35_per_time(df, time_input=time_close)
+    df['diff_strike'] = df['mimush'] - ta35
+    cond_diff_strike = (df.diff_strike.isin(diff_strike))
     df = df.loc[cond_diff_strike]
 
     return df
 
 
-def filter_by_option_type(df, option_type='BOTH'):
-    if option_type.upper() == 'BOTH':
-        return df
-    elif option_type.upper() == 'CALL':
-        cond_option_type = (df.type == 'C')
-    elif option_type.upper() == 'PUT':
-        cond_option_type = (df.type == 'P')
+def filter_by_option_type(df, option_type): 
+    cond_option_type = (df.option_type.isin(option_type))
     df = df.loc[cond_option_type]
 
     return df
@@ -372,3 +396,26 @@ def pnl_ta35_plot(df):
     st.image(buffer, width=800)  # Adjust the width as desired
 
     plt.show()
+
+
+def get_ta35_per_time(df, time_input):
+
+    # Convert time input to datetime
+    time_input = datetime.strptime(time_input, '%H:%M').time()
+
+    # Prtoection if time input above
+    max_time = df.timestamp.dt.time.max()
+
+    # day_in_week = df.timestamp.dt.dayofweek.map(day_of_week_map).iloc[0]
+    # if day_in_week == 1:
+    #     max_time = time(16, 0, 0)
+
+    if max_time < time_input:
+        time_input = max_time
+    # filter df to same time
+    df_filtered = df.loc[df['timestamp'].dt.strftime(
+        '%H:%M') == time_input.strftime('%H:%M')]
+
+    ta35_on_time = df_filtered['ta35'].mode().iloc[0]
+    print(f'ta35_on_time is : {ta35_on_time}')
+    return ta35_on_time

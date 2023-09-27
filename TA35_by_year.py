@@ -1,47 +1,11 @@
 
 from build_up_functions import *
-print(path)
+from strategy_functions import *
 ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
 ta35 = ta35.rename(columns={'Date': 'date'})
-# for year in range(2022,2023):
-#     ta35_yearly = []
-#     [quotes_files] =  glob.glob(quotes_path+str(year)+'/*',recursive=True)
-
-#     for file in quotes_files:
-#         df = pd.read_parquet(file)
-
-#         # remove time components that make problems with time delta
-#         current_day = pd.to_datetime(df.timestamp).dt.floor('D')
-#         date = current_day.iloc[0]
-
-#         # Get option details by its id ('mispar_hoze' column)
-#         if 'dte' not in df.columns:
-#             df = df.merge(option_details,on='mispar_hoze').drop('name',axis=1)
-#             # make it datetime object to substract
-#             expiration_day = pd.to_datetime(df.pkiya)
-#         # create column days left to exipration
-#             df['days_to_exp'] = (expiration_day-current_day).dt.days
-
-#         # get High of the date
-#         high_dayly = ta35.loc[ta35.date==date].High.iloc[0]
-#         low_dayly = ta35.loc[ta35.date == date].Low.iloc[0]
-
-#         # dataframe with 2 columns , timestamp and ta35 at the moment
-#         ta35_dayly = df.query('ta35>=@low_dayly and ta35<=@high_dayly').groupby('timestamp').apply(
-#             lambda x: x.ta35.mode()[0]).reset_index().rename(columns={0: 'ta35_index'})
-#         ta35_dayly['ta35_index'] = ta35_dayly.groupby(ta35_dayly['timestamp'].dt.minute,group_keys=False)['ta35_index'].transform(lambda x: x.mode()[0])
-
-#         ta35_yearly.append(ta35_dayly)
-
-#         print(f'{file} appended!')
-
-
-#     result = pd.concat(ta35_yearly)
-#     result.to_parquet('ta35/TA35_'+str(year)+'.parquet', index=False)
-
 
 # loop over chosen years
-for year in range(2020, 2021):
+for year in range(2022, 2023):
 
     # open new folder to store files of quotes which will be extracted
     create_folder(extract_path_Quotes)
@@ -53,10 +17,13 @@ for year in range(2020, 2021):
     Check_unzip_files(zip_Quotes_files, extract_path=extract_path_Quotes)
 
     unzip_Quotes_files = Unzip_files(
-        zip_Quotes_files[0:1], extract_path_Quotes)
-    id_options_year_path = path + "id_options/id_options" + str(year)+'.csv'
+        zip_Quotes_files, extract_path_Quotes)
+    id_options_file = path + "id_options/all_options_new.csv"
     # dataframe of option's details
-    df_options_id = pd.read_csv(id_options_year_path)
+    df_options_id = pd.read_csv(id_options_file)
+    df_options_id = df_options_id.dropna(subset='pkiya')
+    df_options_id['pkiya'] = pd.to_datetime(df_options_id.pkiya)
+
     for quotes_file in unzip_Quotes_files:
 
         # reset index to have make it parsable
@@ -64,5 +31,27 @@ for year in range(2020, 2021):
         delete_file(quotes_file)
         df_quotes = quotes_parser(df)
         df_quotes = quotes_filter(df_quotes)
-        df_quotes = quotes_merge_with_option_details(df_quotes, df_options_id)
-        df_quotes = quotes_add_computed_ta35_index(df_quotes, ta35)
+
+        current_day = pd.to_datetime(df_quotes.timestamp).dt.floor('D')
+        date = current_day.iloc[0]
+        # Get High of day rounded
+        high_dayly = ta35.loc[ta35.date == date].High.iloc[0]
+        high_dayly = round(high_dayly, -1)
+        # Get Low of day rounded
+        low_dayly = ta35.loc[ta35.date == date].Low.iloc[0]
+        low_dayly = round(low_dayly, -1)
+        a = df_quotes.merge(df_options_id[['mispar_hoze', 'pkiya', 'mimush']],
+                            on='mispar_hoze', how='left').dropna(subset='mimush')
+        a['mimush'] = a['mimush'].astype('int16')
+        a['dte'] = (a['pkiya'] - date).dt.days
+        a = a.loc[(a.mimush >= low_dayly) & (a.mimush <= high_dayly) & (a.ta35 != 0) & (a.dte <= 40)].groupby(
+            'timestamp').ta35.value_counts().reset_index()
+        # Calculate the most common value for each 'timestamp' group
+        most_common_values = a.groupby(a['timestamp'].dt.strftime('%H:%M:%S'))['ta35'].apply(
+            lambda x: x.mode().iloc[0]).reset_index()
+        most_common_values['ta35'] = round(
+            most_common_values['ta35'].astype('int16'), -1)
+        most_common_values['date'] = date
+        most_common_values.to_parquet(path+'ta35/'+str(year)+'/'+str(date.date())+
+                                      '.parquet')
+        print(str(date.date()), 'added')

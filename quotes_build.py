@@ -11,7 +11,7 @@ for year in range(2022, 2023):
 
     # get list of all Quotes files "/B" by year  which are zipped
     zip_Quotes_files = glob.glob(
-        years_path+str(year)+'/M*/D*/B/*', recursive=True)
+        years_path+str(year)+'/MON_01/D23-31/B/*', recursive=True)
     # Check if there is Unzip files
     Check_unzip_files(zip_Quotes_files, extract_path=extract_path_Quotes)
 
@@ -21,7 +21,7 @@ for year in range(2022, 2023):
     # dataframe of option's details
     df_options_id = pd.read_csv(id_options_year_path)
     
-    for quotes_file in unzip_Quotes_files:
+    for quotes_file in unzip_Quotes_files[-1:]:
         print(quotes_file)
         # YYYYMMDD, i.e 20211231 >> 31/12/21
         file_date = datetime.strptime(
