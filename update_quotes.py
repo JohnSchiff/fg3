@@ -1,7 +1,7 @@
 
 ##  this file is for manipulating all quotes files that we are using as database
 
-from build_up_functions import *
+from utils import *
 from strategy_functions import *
 
 # Make sure all data between trading hours 9:45 to 17:30

@@ -1,5 +1,6 @@
 
-from build_up_functions import *
+from process_data_funcs import *
+
 ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
 ta35 = ta35.rename(columns={'Date': 'date'})
 
@@ -12,10 +13,11 @@ for year in range(2022, 2023):
     # get list of all Quotes files "/B" by year  which are zipped
     zip_Quotes_files = glob.glob(
         years_path+str(year)+'/MON_01/D23-31/B/*', recursive=True)
+    
     # Check if there is Unzip files
     Check_unzip_files(zip_Quotes_files, extract_path=extract_path_Quotes)
 
-    unzip_Quotes_files = Unzip_files(zip_Quotes_files, extract_path_Quotes)
+    unzip_Quotes_files = extract_multiple_rar_files(zip_Quotes_files, extract_path_Quotes)
     id_options_year_path = path + "id_options/id_options" + str(year)+'.csv'
     
     # dataframe of option's details

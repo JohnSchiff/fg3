@@ -1,22 +1,21 @@
-from build_up_functions import quotes_path, path
+from utils import *
 import streamlit as st
-import s3fs
-import glob
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 import s3fs
 import matplotlib.pyplot as plt
 import io
-from datetime import time
 
 s3 = s3fs.S3FileSystem()
 
-# ta35 index
-# ta35 = pd.read_csv('ta35_close_for_results.csv', parse_dates=[
-#                    'date']).sort_values(by='date')
-day_of_week_map = {0: 2, 1: 3, 2: 4,
-                   3: 5, 4: 6, 5: 7, 6: 1}
+def remov_row(df):
+
+    # Protection - remove rows where Buy isn't followed by Sell or vice versa
+    cond_deals = ((df['open'] == 0) & (df['mispar_hoze'] == df['mispar_hoze'].shift(-1)) |
+                  (df['open'] == 1) & (df['mispar_hoze']
+                                       == df['mispar_hoze'].shift(1))
+                  & ((df['Type'] != df['Type'].shift(-1)) | (df['Type'] != df['Type'].shift(1))))
+
+    # Apply the protection
+    df = df[cond_deals].sort_values(by=['mispar_hoze', 'timestamp'])
 
 
 def get_month_of_file(file):
@@ -34,16 +33,15 @@ def set_times(df,min_after_open=5, min_before_close=5):
     
     return time_open,time_close
 
-def get_night_quotes(df, dte_min, dte_max,option_type, diff_strike, time_close):
-    print(len(df), 'initally')
-    a = filter_by_diff_strike(df, diff_strike, time_close)
-    print(len(a), 'after diff_strike filter')
+def     get_morning_quotes(df):
+    df = df.groupby('mispar_hoze').head(1)
+    df['open'] = 1
 
-    # df = filter_by_dte(df, dte_min, dte_max)
-    # print(len(df), 'after dte filter')
-    # df = filter_by_option_type(df, option_type)
-    # print(len(df), 'after type filter')
-    
+    return df
+
+def get_night_quotes(df):
+    df = df.groupby('mispar_hoze').tail(1)
+    df['open'] = 0
     return df
 
 
@@ -78,6 +76,29 @@ def open_close_quotes(df, time_open='10:00', time_close='17:30'):
 
     return df_open, df_close
 
+
+def time_close_verify(df, time_close):
+    '''
+    Protection fir time close not too above 
+    '''
+    time_close = pd.to_datetime(time_close, format="%H:%M").time()
+    latest_time_in_df = df['timestamp'].dt.time.max()
+    if latest_time_in_df < time_close:
+        time_close = latest_time_in_df
+
+    return time_close
+
+
+def filter_relevant_options(df, ta35_close):
+    
+    date = get_date_string(df)
+    relevant_options_id = get_relevant_options(ta35_close,date)
+
+    df = df.loc[df.mispar_hoze.isin(relevant_options_id)]
+    
+    return df
+    
+    
 def filter_open_time(df, time_open):
     time_open_plus_minute = (datetime.combine(datetime.today(), time_open) + timedelta(minutes=1)).time()
     cond_time_open = (df.timestamp.dt.time >= time_open) & (
@@ -85,25 +106,11 @@ def filter_open_time(df, time_open):
     df = df.loc[cond_time_open]
     
     return df
-    
+
 def filter_close_time(df, time_close):
     
-    # Convert to datetime format
-    time_close = datetime.strptime(time_close, '%H:%M').time()
-
-    # protection if time close of date is earlier
-    max_time = df.timestamp.dt.time.max()
-    day_in_week = df.timestamp.dt.dayofweek.map(day_of_week_map).iloc[0]
-    if day_in_week == 1:
-        max_time = time(16, 0, 0)   
-    if max_time < time_close:
-        print(max_time)
-        time_close = max_time    
-    time_close_minus_minute = (datetime.combine(datetime.today(), time_close) - timedelta(minutes=1)
-                             ).time()
-    cond_time = (df.timestamp.dt.time <= time_close) &(
-        df.timestamp.dt.time >= time_close_minus_minute)
-    df = df.loc[cond_time]
+    time_close = time_close_verify(df, time_close)
+    df = df.loc[df['timestamp'].dt.time < time_close]
     
     return df
     
@@ -418,4 +425,4 @@ def get_ta35_per_time(df, time_input):
 
     ta35_on_time = df_filtered['ta35'].mode().iloc[0]
     print(f'ta35_on_time is : {ta35_on_time}')
-    return ta35_on_time
+    return ta35_on_time    

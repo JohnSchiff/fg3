@@ -1,5 +1,5 @@
 
-from build_up_functions import *
+from process_data_funcs import *
 
 pkiya = pd.read_csv(path+'/files/pkiya.csv')
 pkiya['pkiya'] = pd.to_datetime(pkiya['pkiya'], format='%d/%m/%Y')
@@ -14,24 +14,20 @@ for year in range(2016, 2022):
     create_folder(extract_path_Trades)
 
     # get list of all Trades files ("/T") by year  which are zipped
-    zip_Trades_files = glob.glob(
-        years_path+str(year)+'/M*/D*/T/*', recursive=True)
+    zip_Trades_files = glob.glob(years_path+str(year)+'/M*/D*/T/*', recursive=True)
 
     # Check if there is Unzip files
     Check_unzip_files(zip_Trades_files, extract_path=extract_path_Trades)
 
     # loop over all zipped files and extract them to extract path
     for zip_file in zip_Trades_files:
-        print(zip_file, '\n')
-        patoolib.extract_archive(
-            zip_file, outdir=extract_path_Trades, verbosity=0)
+        # unzip trade file
+        extract_single_rar_file(zip_file,extract_path_Trades)        
         trade_file = glob.glob(extract_path_Trades+'/*')[0]
-
         # All trades extract into one big dataframe
         df = filter_Trade_File(trade_file)
         # Delete csv file to save memory
         delete_file(trade_file)
-
         # append filtered trade files to a huge list
         l.append(df)
 

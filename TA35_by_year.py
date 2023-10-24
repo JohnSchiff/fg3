@@ -1,5 +1,5 @@
 
-from build_up_functions import *
+from utils import *
 from strategy_functions import *
 ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
 ta35 = ta35.rename(columns={'Date': 'date'})
