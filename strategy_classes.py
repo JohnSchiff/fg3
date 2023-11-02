@@ -23,7 +23,7 @@ class Open_close_strategy():
         options_day_before = []
         l = []  
         # Year files
-        year_files = glob.glob(quotes_path+f'/{self.year}/*')
+        year_files = get_quotes_by_years(years=self.year)
         # files by months
         files = [file for file in year_files if datetime.strptime(file[-18:-8], '%Y-%m-%d').month in self.months]
         for file in files:

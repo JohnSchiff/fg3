@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import patoolib
 import pandas as pd
 import numpy as np
-import matplotlib.dates as mdates
 import shutil
 import os
 import sys
@@ -20,11 +19,12 @@ path = 'C:\\Users\\yschiff\\OneDrive - Cisco\\Desktop\\FG3/'# os.getcwd()+'/'
 
 
 # data path
-years_path = path + "data/"
+data_path = path + "data/"
 
 # folder to extract Trades files
 extract_path_Trades = path + "extract_files_trades/"
 
+extract_folder = path + "extract_folder/"
 # folder to extract Quotes files
 
 extract_path_Quotes = path+'extract_files_quotes/'
@@ -32,6 +32,10 @@ extract_path_Quotes = path+'extract_files_quotes/'
 quotes_path = path+'quotes/'
 day_of_week_map = {0: 2, 1: 3, 2: 4,
                    3: 5, 4: 6, 5: 7, 6: 1}
+
+ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
+ta35 = ta35.rename(columns={'Date': 'date'})
+
 # ============================
 # ============================
 # ===  Global FUNCTIONS  ===
@@ -49,7 +53,7 @@ def create_folder(path_of_dir):
 
     os.mkdir(path_of_dir)
 
-    return print('Folder Created')
+    return print(f'Folder created in {path_of_dir}')
 
 
 def delete_file(file):
@@ -199,6 +203,18 @@ def add_options_details(df, year):
     df = df.merge(df_id, on='mispar_hoze', how='left')
     
     return df
+
+
+def get_quotes_by_years(years):
+    if not isinstance(years, list):
+    # If 'years' is not a list, convert it to a list with one element
+        years = [years]
+    files = []
+    for year in years:
+        quotes_files = glob.glob(quotes_path+f'/{year}/*')
+        files.extend(quotes_files)
+    return files
+
 
 
 def ta35_df_by_date(df):
@@ -481,7 +497,7 @@ def quotes_filter(df_quotes):
     return df_quotes
 
 
-def quotes_merge_with_option_details(df, df_options_id):\
+def quotes_merge_with_option_details(df, df_options_id):
 
     df = df.merge(df_options_id, on='mispar_hoze',
                   how='left').dropna(subset='name')
@@ -533,10 +549,13 @@ def quotes_add_computed_ta35_index(df, ta35):
     # Create a mapping dictionary timestamp and value of ta35
     mapping_dict = dict(
         zip(most_common_values['timestamp'], most_common_values['ta35']))
-
+    
+    # Sort by time
+    df.sort_values(by='timestamp' ,inplace=True) 
+    
     # Correct the ta35 values by mapping values and forward-fill NaN values
     df['ta35'] = df['timestamp'].dt.strftime('%H:%M:%S').map(
-        mapping_dict).fillna(method='ffill').astype(int)
+        mapping_dict).fillna(method='ffill').fillna(method='bfill').astype(int)
 
     # Crete column of diffrent strike from ta35
     df['diff_strike'] = df['mimush'] - df['ta35']
@@ -546,7 +565,7 @@ def quotes_add_computed_ta35_index(df, ta35):
     df['ta35'] = df['ta35'].astype('int16')
 
     # Drop columns
-    df.drop(columns=['name', 'pkiya'], inplace=True)
+    df.drop(columns=['name','pkiya'], inplace=True)
 
     return df
 

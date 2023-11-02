@@ -1,7 +1,6 @@
 from utils import *
 from strategy_functions import *
-pd.set_option('display.max_rows', 201)
-pd.set_option('display.max_columns', None)
+
 trades_path = "C:/Users/yschiff/OneDrive - Cisco/Desktop/FG3/Trades/"
 ta_path= "C:/Users/yschiff/OneDrive - Cisco/Desktop/FG3/ta35/TA 35 Historical Data.csv"
 ta35 = pd.read_csv(ta_path)

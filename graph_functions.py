@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 def Graph_performance(df,path,low_diff,days_letf_min,days_letf_max):
@@ -18,17 +19,13 @@ def Graph_performance(df,path,low_diff,days_letf_min,days_letf_max):
     ax1.set_title("Nominal Return  diffrence from madad is "+
     str (low_diff)+' points, days to Exipration from '+str(days_letf_min)+' to '+str(days_letf_max),
     fontsize=12)
-    # ax2.set_xlabel("Date", fontsize=10)
     ax2.set_ylabel("Madad TA35",fontsize=10)
 
-    # ax3.set_xlabel("Date", fontsize=10)
     ax3.set_ylabel("Return in Percentages",fontsize=10)
     ax3.set_title(" Return Normalized in pct diffrence from madad is "+
     str (low_diff)+' points,  days to Exipration from '+str(days_letf_min)+' to '+str(days_letf_max),
     fontsize=12)
-    # for ax in [ax1,ax2,ax3]:
-    #     locator = mdates.YearLocator()
-    #     ax.xaxis.set_major_locator(locator)
+
 
     ax1.plot(df.date,df.nominal_sum,color='g')
     ax2.plot(TA35_close.Date,TA35_close.Close,color='r',label='Madad Tel Aviv 35')
