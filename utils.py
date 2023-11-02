@@ -235,40 +235,18 @@ def ta35_df_by_date(df):
     return "No date was found"    
 
 
-def get_ta35_by_time(df_ta35, time_input):
+def get_ta35_by_time(df, time_input):
     # time_input = pd.to_datetime(time_input, format="%H:%M")
+    df_ta35 = ta35_df_by_date(df)
     # Check if time input is in timestamp column
     if not (df_ta35['timestamp'] == time_input).any(): 
         time_differences = abs(df_ta35['timestamp'] - time_input)
-        closest_time = df_ta35.loc[time_differences.idxmin(), 'timestamp']
-        time_input = closest_time
+        # Get the closest time 
+        time_input = df_ta35.loc[time_differences.idxmin(), 'timestamp']
         
     ta35_value = df_ta35.loc[df_ta35['timestamp'] == time_input, 'ta35'].iloc[0]
 
     return ta35_value
-
-
-def get_relevant_options(ta35_value, date):
-    
-    # Get year from date
-    year = int(date.split('-')[0])
-    # File which contains details of all monthly options
-    id_optios_file = glob.glob(path+f'id_options/*{year}*')[0]
-    # Read entire file
-    df_id = pd.read_csv(id_optios_file)
-    # Convert 'pkiya' expiration date to datetime in order to substruct
-    df_id['pkiya'] = pd.to_datetime(df_id['pkiya'], format="%Y-%m-%d")  
-    # Convert 'date' variable to datetime in order to substruct
-    date_ = pd.to_datetime(date, format="%Y-%m-%d")
-    # Substruct expiration date from date input
-    df_id['dte'] = (df_id.pkiya - date_).dt.days
-    # Get the value of closest date 
-    min_dte = df_id.loc[df_id.dte > 0].dte.min()
-    cond_close = (df_id['mimush'] == ta35_value)
-    cond_dte = (df_id['dte'] == min_dte)
-    # Find the options based on filters
-    rel_options = df_id.loc[cond_close & cond_dte].mispar_hoze.to_list()
-    return  rel_options
 
 
 def remove_non_trade_rows(df):
@@ -309,12 +287,12 @@ def sell_buy_in_same_row_df(df, short=False):
         sell = 'p1_Bid'
         buy = 'p1_Ask'
         cols = ['trade_id', 'mispar_hoze', 'sell',
-                'buy', 'timestamp_buy', 'timestamp_sell']
+                'buy', 'timestamp_close', 'timestamp_open']
     else:
         sell = 'p1_Ask'
         buy  = 'p1_Bid'
         cols = ['trade_id', 'mispar_hoze', 'buy',
-                'sell', 'timestamp_buy', 'timestamp_sell']
+                'sell', 'timestamp_close', 'timestamp_open']
     # Define custom aggregation functions
     agg_funcs = {
         'mispar_hoze': 'first',
@@ -330,7 +308,7 @@ def sell_buy_in_same_row_df(df, short=False):
     # Rename the resulting columns for clarity
     result_df.columns = cols
     
-    result_df.sort_values(by='timestamp_buy',inplace=True)
+    result_df.sort_values(by='timestamp_close',inplace=True)
     
     return result_df
 

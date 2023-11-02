@@ -33,10 +33,9 @@ def set_times(df,min_after_open=5, min_before_close=5):
     
     return time_open,time_close
 
-def     get_morning_quotes(df):
+def get_morning_quotes(df):
     df = df.groupby('mispar_hoze').head(1)
     df['open'] = 1
-
     return df
 
 def get_night_quotes(df):
@@ -79,7 +78,7 @@ def open_close_quotes(df, time_open='10:00', time_close='17:30'):
 
 def time_close_verify(df, time_close):
     '''
-    Protection fir time close not too above 
+    Protection for time close not too above 
     '''
     time_close = pd.to_datetime(time_close, format="%H:%M").time()
     latest_time_in_df = df['timestamp'].dt.time.max()
@@ -87,18 +86,7 @@ def time_close_verify(df, time_close):
         time_close = latest_time_in_df
 
     return time_close
-
-
-def filter_relevant_options(df, ta35_close):
-    
-    date = get_date_string(df)
-    relevant_options_id = get_relevant_options(ta35_close,date)
-
-    df = df.loc[df.mispar_hoze.isin(relevant_options_id)]
-    
-    return df
-    
-    
+        
 def filter_open_time(df, time_open):
     time_open_plus_minute = (datetime.combine(datetime.today(), time_open) + timedelta(minutes=1)).time()
     cond_time_open = (df.timestamp.dt.time >= time_open) & (
@@ -111,7 +99,6 @@ def filter_close_time(df, time_close):
     
     time_close = time_close_verify(df, time_close)
     df = df.loc[df['timestamp'].dt.time < time_close]
-    
     return df
     
 def filter_by_times(df, time_open, time_close):
@@ -127,9 +114,10 @@ def filter_by_times(df, time_open, time_close):
     
     return df
 
-def filter_by_dte(df, dte_min=1, dte_max=31):
-    cond_dte = (df.dte <= dte_max) & (df.dte >= dte_min)
-    df = df.loc[cond_dte]
+def create_dte_column(df, col='timestamp'):
+    df['pkiya'] = pd.to_datetime(df['pkiya'], format="%Y-%m-%d")
+    date_ = df[col].dt.normalize()
+    df['dte'] = (df.pkiya - date_).dt.days
 
     return df
 
