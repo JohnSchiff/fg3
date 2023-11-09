@@ -15,8 +15,8 @@ pd.options.mode.chained_assignment = None  # Disable the warning
 
 
 # project main path
-path = 'C:\\Users\\yschiff\\OneDrive - Cisco\\Desktop\\FG3/'# os.getcwd()+'/'
-
+# path = 'C:\\Users\\yschiff\\OneDrive - Cisco\\Desktop\\FG3/'# os.getcwd()+'/'
+path = os.path.dirname(os.getcwd())
 
 # data path
 data_path = path + "data/"
@@ -29,12 +29,13 @@ extract_folder = path + "extract_folder/"
 
 extract_path_Quotes = path+'extract_files_quotes/'
 
-quotes_path = path+'quotes/'
+# quotes_path = path+'quotes/'
+quotes_path = '/home/quotes/'
 day_of_week_map = {0: 2, 1: 3, 2: 4,
                    3: 5, 4: 6, 5: 7, 6: 1}
 
-ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
-ta35 = ta35.rename(columns={'Date': 'date'})
+# ta35 = pd.read_csv(path+'ta35/TA_35_Historical_Data.csv', parse_dates=['Date'])
+# ta35 = ta35.rename(columns={'Date': 'date'})
 
 # ============================
 # ============================
@@ -278,39 +279,7 @@ def filter_option_type(df, call=True):
     return df
   
     
-def sell_buy_in_same_row_df(df, short=False):
 
-    # asssign trade id for each trade
-    df['trade_id'] = (df.index // 2) + 1
-
-    if short:
-        sell = 'p1_Bid'
-        buy = 'p1_Ask'
-        cols = ['trade_id', 'mispar_hoze', 'sell',
-                'buy', 'timestamp_close', 'timestamp_open']
-    else:
-        sell = 'p1_Ask'
-        buy  = 'p1_Bid'
-        cols = ['trade_id', 'mispar_hoze', 'buy',
-                'sell', 'timestamp_close', 'timestamp_open']
-    # Define custom aggregation functions
-    agg_funcs = {
-        'mispar_hoze': 'first',
-        sell: 'first',
-        buy: 'last',
-        'timestamp': ['first', 'last']  # Aggregate both first and last timestamps
-
-    }
-
-    # Group by 'trade_id' and apply custom aggregation functions
-    result_df = df.groupby('trade_id', as_index=False).agg(agg_funcs)
-
-    # Rename the resulting columns for clarity
-    result_df.columns = cols
-    
-    result_df.sort_values(by='timestamp_close',inplace=True)
-    
-    return result_df
 
 # ============================
 # ============================

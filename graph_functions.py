@@ -3,6 +3,139 @@ import numpy as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
+def get_drawdown(df):
+    '''
+    input - dataframe
+    output - real drawdown from normal return in percentages 
+    '''
+    df['pnl_cumsum'] = df.pnl.cumsum()
+    t = df['pnl_cumsum'].reset_index(drop=True)  # take column of P&L
+    drawdown_nominal = t.min()
+    lowest_yield = drawdown_nominal
+    highest_yield = t.max()
+    for i in t.index:
+        current_yield = t.iloc[i]
+        min_yield = t.iloc[i:].min()
+        drawdown_temp = min_yield - current_yield
+
+        if drawdown_temp < drawdown_nominal:
+
+            drawdown_nominal = drawdown_temp  # change original
+            lowest_yield = min_yield
+            highest_yield = t.iloc[i]
+
+    st.write(
+        f'Drawdown is {drawdown_nominal} ,lowest point is {lowest_yield},Pick point is {highest_yield}')
+
+    return drawdown_nominal
+
+
+def performance_table(df):
+    drawdown = get_drawdown(df)
+    n_trades = len(df)
+    d = {'Drawdown': drawdown,
+         'N': n_trades}
+    data = pd.DataFrame(d, index=['Stratergy Results'])
+
+    result_by_month = df.groupby('month')['pnl'].agg(['sum', 'count']).astype(
+        int).reset_index().rename(columns={'sum': 'return_per_month', 'count': 'number_of_trades'})
+    result_by_diff_strike = df.groupby('diff_mimush_close')['pnl'].agg(
+        'sum').astype(int).reset_index().rename(columns={'sum': 'return_per_diff'})
+    st.write(data)
+    st.write(result_by_month)
+    st.write(result_by_diff_strike)
+
+
+def ta35_plot(df):
+    # Find the earliest and latest dates
+    earliest_date = df['timestamp_open'].min().date()
+    latest_date = df['timestamp_open'].max().date()
+
+    df_ta35 = ta35.loc[ta35['date'].dt.date > earliest_date]
+    # Set the figure size directly in subplots()
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Rotate the x-axis tick labels for better readability
+    ax.tick_params(axis='x', rotation=45)
+
+    ax.plot(df_ta35.date, df_ta35.ta35_index)
+
+
+def pnl_plot(df):
+    fig, ax = plt.subplots()
+    ax.plot(df.timestamp_open.dt.date, df.pnl_cumsum)
+    # ax.plot(sp500_df.Date, sp500_df.Close, label='S&P 500')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Cumulative Sum')
+    ax.set_title('Cumulative Sum Over Time')
+    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, which='both')
+    ax.axhline(y=0, color='red')
+    # Adjust the size of the plot within the Streamlit app
+    fig.set_size_inches(6, 3)  # Adjust the width and height as desired
+
+    # Save the figure to a byte buffer
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0.1)
+    buffer.seek(0)
+
+    # Display the image in Streamlit with adjusted width
+    st.image(buffer, width=600)  # Adjust the width as desired
+    ta35_plot(df)
+
+    plt.show()
+
+
+def pnl_ta35_plot(df):
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(12, 9), sharex=True)
+
+    # Plot pnl_cumsum on ax1
+    ax1.plot(df.timestamp_open.dt.date, df.pnl_cumsum)
+    ax1.set_ylabel('Cumulative Sum')
+    ax1.set_title('Cumulative Sum Over Time')
+    ax1.tick_params(axis='x', rotation=45)
+    ax1.grid(True, which='both')
+    ax1.axhline(y=0, color='red')
+
+    # Plot ta35_index on ax2
+    earliest_date = df['timestamp_open'].min().date()
+    latest_date = df['timestamp_open'].max().date()
+    df_ta35 = ta35.loc[(ta35['date'].dt.date > earliest_date)
+                       & (ta35['date'].dt.date < latest_date)]
+    ax2.plot(df_ta35.date, df_ta35.ta35_index)
+    ax2.grid(True, which='both')
+    ax2.set_ylabel('TA35 Index')
+    ax2.tick_params(axis='x', rotation=45)
+
+    # Adjust the size of the plot within the Streamlit app
+    fig.set_size_inches(12, 9)  # Adjust the width and height as desired
+
+    # Save the figure to a byte buffer
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0.1)
+    buffer.seek(0)
+
+    # Display the image in Streamlit with adjusted width
+    st.image(buffer, width=800)  # Adjust the width as desired
+
+    plt.show()
+
+
+def get_ta35_per_time(df, time_input):
+    # Convert time input to datetime
+    time_input = datetime.strptime(time_input, '%H:%M').time()
+    # Prtoection if time input above
+    max_time = df.timestamp.dt.time.max()
+    # day_in_week = df.timestamp.dt.dayofweek.map(day_of_week_map).iloc[0]
+    if max_time < time_input:
+        time_input = max_time
+    # filter df to same time
+    df_filtered = df.loc[df['timestamp'].dt.strftime(
+        '%H:%M') == time_input.strftime('%H:%M')]
+
+    ta35_on_time = df_filtered['ta35'].mode().iloc[0]
+    print(f'ta35_on_time is : {ta35_on_time}')
+    return ta35_on_time 
 
 def Graph_performance(df,path,low_diff,days_letf_min,days_letf_max):
 

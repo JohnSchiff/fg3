@@ -25,7 +25,7 @@ class DataParser:
         # dataframe of options id
         df_options_id = self.df_options_per_year()
         # Iterate over each zip file
-        for zip_file in zip_files[0:6]:
+        for zip_file in zip_files:
             extracted_files = self.unzip_file(zip_file)
             for file in extracted_files:
                 print(f'*************************************{file}***********************************')
@@ -33,6 +33,8 @@ class DataParser:
                     df = self.process_quotes_data(file, df_options_id)
                 elif self.files_type == 'T':
                     df = self.process_trades_data(file, df_options_id)
+                if df is False:
+                    continue
                 self.save_data(df)
                 delete_file(file)
                 # return df
@@ -46,7 +48,12 @@ class DataParser:
         return 1
 
     def process_quotes_data(self, file, df_options_id):
-        df = pd.read_csv(file).reset_index()
+        try:
+            df = pd.read_csv(file).reset_index()
+        except:
+            return False
+        if len(df) == 0:
+            return False
         df_quotes = quotes_parser(df)
         df_quotes = quotes_filter(df_quotes)
         df_quotes = quotes_merge_with_option_details(df_quotes, df_options_id)
@@ -65,7 +72,4 @@ class DataParser:
     
         
 
-# Example usage
-a = DataParser(data_path, extract_folder,'B', 2021)
 
-a1 = a.process_files_for_year()
