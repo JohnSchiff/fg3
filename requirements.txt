@@ -1,0 +1,6 @@
+pandas
+numpy
+patool
+streamlit
+matplotlib
+openpyxl

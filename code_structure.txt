@@ -1,0 +1,9 @@
+my_project/
+    ├── main.py
+    ├── data_processor.py
+    ├── strategy.py
+    ├── utils.py
+    ├── constants.py  # Constants module
+    ├── tests/
+    │   ├── test_data_processor.py
+    │   └── test_strategy.py
