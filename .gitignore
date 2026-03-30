@@ -28,3 +28,6 @@ credentials.json
 
 # TASE reference PDFs (13MB)
 README_dir/
+
+# Hebrew docs
+DATA_GUIDE_HE.md
