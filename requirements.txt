@@ -1,0 +1,4 @@
+duckdb>=1.2.0
+pyarrow>=17.0.0
+pandas>=2.2.0
+yfinance>=0.2.40  # optional: refresh data/ta35_daily_range.csv from Yahoo TA35.TA
