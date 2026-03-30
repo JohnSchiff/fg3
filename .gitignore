@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv
+.venv_onedrive/
+
+# Data (98GB raw REP files — too large for GitHub)
+data/2*/
+
+# Parquet & DuckDB output
+output/
+*.duckdb
+*.duckdb.tmp
+
+# OS / IDE
+.DS_Store
+.vscode/
+.cursor/
+
+# Secrets
+.env
+*.credentials
+credentials.json
+
+# Claude Code internals
+.claude/
+
+# TASE reference PDFs (13MB)
+README_dir/
+
+# Hebrew docs
+DATA_GUIDE_HE.md
